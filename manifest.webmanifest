@@ -1,20 +1,39 @@
 {
   "id": "/umeda-coupon/?source=pwa",
-  "name": "クーポン",
-  "short_name": "クーポン",
+  "name": "大丸・松坂屋",
+  "short_name": "大丸・松坂屋",
   "description": "优惠券演示页面（演示用途，不能进行真实核销或积分变动）。",
   "lang": "ja",
   "dir": "ltr",
   "start_url": "/umeda-coupon/",
   "scope": "/umeda-coupon/",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui", "browser"],
+  "display_override": [
+    "standalone",
+    "minimal-ui",
+    "browser"
+  ],
   "orientation": "portrait",
   "background_color": "#ffffff",
   "theme_color": "#ffffff",
   "icons": [
-    { "src": "icon-daimaru-180.png", "sizes": "180x180", "type": "image/png", "purpose": "any" },
-    { "src": "icon-daimaru-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icon-daimaru-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    {
+      "src": "icon-daimaru-180.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-daimaru-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-daimaru-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ]
 }
