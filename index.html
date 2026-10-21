@@ -262,6 +262,18 @@
       cursor: pointer;
       z-index: 10;
     }
+    /* page7点击区域（使用完成 → 点任意位置回首页） */
+    #page7 .click-area {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: transparent;
+      cursor: pointer;
+      z-index: 10;
+      pointer-events: auto;
+    }
     /* 统一page4和page6的时间显示样式 */
     #page4 .time-display, #page6 .time-display {
       position: absolute;
