@@ -1,12 +1,9 @@
 {
-  "id": "/umeda-coupon/?source=pwa",
   "name": "大丸・松坂屋",
   "short_name": "大丸・松坂屋",
   "description": "优惠券演示页面（演示用途，不能进行真实核销或积分变动）。",
   "lang": "ja",
   "dir": "ltr",
-  "start_url": "/umeda-coupon/",
-  "scope": "/umeda-coupon/",
   "display": "standalone",
   "display_override": [
     "standalone",
@@ -34,6 +31,15 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "icon-daimaru-1024.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
     }
-  ]
+  ],
+  "id": "/umeda-coupon/?source=pwa",
+  "start_url": "/umeda-coupon/",
+  "scope": "/umeda-coupon/"
 }
