@@ -200,33 +200,42 @@
     .barcode-page {
       position: relative;
     }
+    /* 日期时间：竖排（rotate -90），日期和倒计时分居图中时钟图标两侧，JS 精确对位 */
     .time-display {
       position: absolute;
-      top: calc(100% * 2.5 / 3); 
-      left: calc(100% * 0.78 / 5); 
-      font-size: 7vw; 
+      top: 80%;
+      left: 14%;
+      display: flex;
+      align-items: center;
+      gap: 0.55em;
       color: #888;
       background-color: transparent;
       z-index: 10;
       transform: rotate(-90deg);
       transform-origin: top left;
-      letter-spacing: -1px;
-      font-weight: 500; 
+      font-weight: 400;
       white-space: nowrap;
       pointer-events: none;
-      font-family: "PingFang SC", "Microsoft YaHei", "Heiti SC", sans-serif; /* 系统字体序列 */
+      line-height: 1;
+      font-family: "PingFang SC", "Helvetica Neue", "Microsoft YaHei", "Heiti SC", sans-serif;
     }
-    .time-display .separator {
-      display: inline-block;
-      width: 10vw; 
-      max-width: 80px;
+    .td-date {
+      font-size: 5.5vw;
+      letter-spacing: -0.02em;
     }
-    .time-display .countdown-part {
-      color: #667380; 
-      font-weight: 400; 
-      font-size: 0.9em; 
+    .td-gap {
+      /* 让出图中自带的时钟图标位置 */
+      flex: 0 0 auto;
+      width: 6.6vw;
+      align-self: center;
     }
-    .time-display .expired {
+    .td-time {
+      font-size: 4.7vw;
+      color: #667380;
+      letter-spacing: 0;
+      font-variant-numeric: tabular-nums;
+    }
+    .td-time.expired {
       color: #ff0000;
     }
     #page3, #page5, #page6 {
@@ -250,10 +259,10 @@
     }
     .page5-click-area {
       position: absolute;
-      top: 50%;
-      left: 14%;
-      width: 66%;
-      height: 7%;
+      top: 50.8%;
+      left: 4.5%;
+      width: 76%;
+      height: 5.8%;
       background-color: transparent;
       cursor: pointer;
       z-index: 10;
@@ -281,35 +290,10 @@
       z-index: 10;
       pointer-events: auto;
     }
-    /* 统一page4和page6的时间显示样式 */
-    #page4 .time-display, #page6 .time-display {
-      position: absolute;
-      top: calc(100% * 2.55 / 3); 
-      left: calc(100% * 0.73 / 5); 
-      font-size: 6vw; 
-      color: #888;
-      background-color: transparent;
-      z-index: 10;
-      transform: rotate(-90deg);
-      transform-origin: top left;
-      letter-spacing: -1px;
-      font-weight: 400; 
-      white-space: nowrap;
-      pointer-events: none;
-      font-family: "PingFang SC", "Microsoft YaHei", "Heiti SC", sans-serif; /* 系统字体序列 */
-    }
+    /* page4 与 page6 共用 .time-display（见上），无需重复定义 */
 
     @media (max-width: 768px) {
-      .time-display {
-        font-size: 4.5vw; 
-        top: calc(100% * 2.55 / 3); 
-        left: calc(100% * 0.73 / 5); 
-        letter-spacing: 0px;
-      }
-      .time-display .separator {
-        width: 8vw; 
-        max-width: 50px;
-      }
+      /* 字号已用 vw，随宽度自适应，无需覆写 */
     }
 
     /* ── 添加到主屏幕提示条（仅在浏览器中打开时出现，桌面图标启动时不显示） ── */
@@ -426,10 +410,8 @@
       src="page7.jpg" 
       alt="优惠券使用完成页"
     >
-    <div class="time-display" id="page7TimeDisplay"></div>
     <div class="click-area" onclick="switchPage('page7', 'page1')"></div>
   </div>
-
 
   <div class="modal" id="couponModal">
     <div class="modal-content">
@@ -481,6 +463,9 @@
           countdownInterval = null;
         }
       }
+      if (toPageId === 'page4' || toPageId === 'page6') {
+        layoutClock();
+      }
     }
 
     function startCountdown() {
@@ -501,43 +486,72 @@
         if (remainingSeconds <= 0) {
           clearInterval(countdownInterval);
           countdownInterval = null;
-          const countdownEl = document.querySelector('.countdown-part');
-          if (countdownEl) countdownEl.classList.add('expired');
+          document.querySelectorAll('.td-time').forEach(function (el) { el.classList.add('expired'); });
           // 倒计时结束自动跳转page6
           switchPage('page4', 'page7');
         }
       }, 1000);
     }
 
+    /* ── 日期时间渲染：日期和倒计时分居图中时钟图标两侧 ── */
+    const CLOCK_POS = { x: 0.226, y: 0.6657 }; // 时钟图标在 page4/page6 图中的相对位置（两图实测一致）
+
+    function dateStr() {
+      const now = new Date();
+      return now.getFullYear() + '/' +
+        String(now.getMonth() + 1).padStart(2, '0') + '/' +
+        String(now.getDate()).padStart(2, '0');
+    }
+
+    function timeHTML() {
+      const m = String(Math.floor(remainingSeconds / 60)).padStart(2, '0');
+      const s = String(remainingSeconds % 60).padStart(2, '0');
+      return '<span class="td-date">' + dateStr() + '</span>' +
+             '<span class="td-gap"></span>' +
+             '<span class="td-time">' + m + ':' + s + '</span>';
+    }
+
     function updatePage4Time(seconds) {
       const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const day = String(now.getDate()).padStart(2, '0');
-      const dateStr = `${year}/${month}/${day}`;
-
+      const ds = now.getFullYear() + '/' +
+        String(now.getMonth() + 1).padStart(2, '0') + '/' +
+        String(now.getDate()).padStart(2, '0');
       const minutes = String(Math.floor(seconds / 60)).padStart(2, '0');
       const secs = String(seconds % 60).padStart(2, '0');
-      const countdownStr = `${minutes}:${secs}`;
-
-      document.getElementById('page4TimeDisplay').innerHTML = 
-        `${dateStr}<span class="separator"></span><span class="countdown-part">${countdownStr}</span>`;
+      document.getElementById('page4TimeDisplay').innerHTML =
+        '<span class="td-date">' + ds + '</span>' +
+        '<span class="td-gap"></span>' +
+        '<span class="td-time">' + minutes + ':' + secs + '</span>';
     }
 
     function updatePage6Time() {
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const day = String(now.getDate()).padStart(2, '0');
-      const dateStr = `${year}/${month}/${day}`;
-
-      const minutes = String(Math.floor(remainingSeconds / 60)).padStart(2, '0');
-      const secs = String(remainingSeconds % 60).padStart(2, '0');
-      const countdownStr = `${minutes}:${secs}`;
-
-      document.getElementById('page6TimeDisplay').innerHTML = 
-        `${dateStr}<span class="separator"></span><span class="countdown-part">${countdownStr}</span>`;
+      document.getElementById('page6TimeDisplay').innerHTML = timeHTML();
     }
+
+    /* 把 .td-gap 精确对到图中时钟图标上（日期在下、时间在上） */
+    function layoutClock() {
+      ['page4TimeDisplay', 'page6TimeDisplay'].forEach(function (id) {
+        const el = document.getElementById(id);
+        if (!el || !el.innerHTML) return;
+        const page = el.closest('.page');
+        if (!page || !page.classList.contains('active')) return;
+        const img = page.querySelector('img');
+        const gap = el.querySelector('.td-gap');
+        if (!img || !gap) return;
+        const ir = img.getBoundingClientRect();
+        const gr = gap.getBoundingClientRect();
+        const tx = ir.left + CLOCK_POS.x * ir.width;
+        const ty = ir.top + CLOCK_POS.y * ir.height;
+        const dx = tx - (gr.left + gr.width / 2);
+        const dy = ty - (gr.top + gr.height / 2);
+        if (dx || dy) {
+          const cs = getComputedStyle(el);
+          el.style.left = (parseFloat(cs.left) + dx) + 'px';
+          el.style.top = (parseFloat(cs.top) + dy) + 'px';
+        }
+      });
+    }
+    window.addEventListener('resize', layoutClock);
 
     function openCouponModal() {
       document.getElementById('couponModal').style.display = 'flex';
