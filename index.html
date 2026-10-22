@@ -20,25 +20,12 @@
   <meta name="robots" content="noindex, nofollow, noimageindex, noarchive">
   <meta name="referrer" content="no-referrer">
   <style>
-    html {
-      height: 100%;
-      overflow: hidden;
-      overscroll-behavior: none;
-      -webkit-text-size-adjust: 100%;
-    }
     body {
       margin: 0;
       padding: 0;
-      /* 整页钉死：不滚动、不回弹、不缩放 */
-      position: fixed;
-      inset: 0;
-      overflow: hidden;
-      overscroll-behavior: none;
       background-color: #fff;
-      touch-action: none;
+      touch-action: manipulation;
       -webkit-touch-callout: none;
-      -webkit-user-select: none;
-      user-select: none;
     }
     .page {
       display: none;
@@ -48,19 +35,6 @@
     }
     .page.active {
       display: block;
-    }
-    /* 每屏外层：宽度/高度由 JS 计算，永远刚好装进屏幕，不产生滚动 */
-    .frame {
-      position: relative;
-      margin: 0 auto;
-      overflow: hidden;
-    }
-    .frame > img {
-      width: 100%;
-      height: 100%;
-      display: block;
-      pointer-events: none;
-      -webkit-user-drag: none;
     }
     img {
       width: 100%;
@@ -381,42 +355,38 @@
 </head>
 <body>
   <div class="page active" id="page1">
-    <div class="frame">
-      <img 
-        src="page1.jpg" 
-        alt="优惠券列表" 
-      >
-      <div class="click-area" onclick="switchPage('page1', 'page2')"></div>
-    </div>
+    <img 
+      src="page1.jpg" 
+      alt="优惠券列表" 
+    >
+    <div class="click-area" onclick="switchPage('page1', 'page2')"></div>
   </div>
 
   <div class="page" id="page2">
-    <div class="frame">
-      <img 
-        src="page2.jpg" 
-        alt="优惠券详细信息"
-      >
-      <div 
-        class="page2-coupon-click" 
-        onclick="openCouponModal()"
-      ></div>
-    </div>
+    <img 
+      src="page2.jpg" 
+      alt="优惠券详细信息"
+    >
+    <div 
+      class="page2-coupon-click" 
+      onclick="openCouponModal()"
+    ></div>
+  </div>
+
   </div>
 
   <div class="page" id="page5">
-    <div class="frame">
-      <img 
-        src="page5.jpg" 
-        alt="优惠券确认页"
-      >
-      <div class="page5-click-area" onclick="switchPage('page5', 'page4')"></div>
-    </div>
+    <img 
+      src="page5.jpg" 
+      alt="优惠券确认页"
+    >
+    <div class="page5-click-area" onclick="switchPage('page5', 'page4')"></div>
   </div>
 
   <div class="page" id="page4">
-    <div class="frame barcode-page">
-      <!-- 右侧1/3点击区域，直接跳转page6 -->
-      <div class="right-third-click" onclick="switchPage('page4', 'page6')"></div>
+    <!-- 右侧1/3点击区域，直接跳转page6 -->
+    <div class="right-third-click" onclick="switchPage('page4', 'page6')"></div>
+    <div class="barcode-page">
       <img 
         src="page4.png" 
         alt="优惠券条码"
@@ -427,24 +397,20 @@
 
   <!-- 新增page6页面 -->
   <div class="page" id="page6">
-    <div class="frame">
-      <img 
-        src="page6.png" 
-        alt="优惠券使用完成页"
-      >
-      <div class="time-display" id="page6TimeDisplay"></div>
-      <div class="click-area" onclick="switchPage('page6', 'page7')"></div>
-    </div>
+    <img 
+      src="page6.png" 
+      alt="优惠券使用完成页"
+    >
+    <div class="time-display" id="page6TimeDisplay"></div>
+    <div class="click-area" onclick="switchPage('page6', 'page7')"></div>
   </div>
   
   <div class="page" id="page7">
-    <div class="frame">
-      <img 
-        src="page7.jpg" 
-        alt="优惠券使用完成页"
-      >
-      <div class="click-area" onclick="switchPage('page7', 'page1')"></div>
-    </div>
+    <img 
+      src="page7.jpg" 
+      alt="优惠券使用完成页"
+    >
+    <div class="click-area" onclick="switchPage('page7', 'page1')"></div>
   </div>
 
   <div class="modal" id="couponModal">
@@ -586,37 +552,6 @@
       });
     }
     window.addEventListener('resize', layoutClock);
-
-    /* ── 每屏刚好铺进屏幕：整页固定，手指上下滑不会动 ── */
-    function fitFrames() {
-      const vw = window.innerWidth || document.documentElement.clientWidth;
-      const vh = window.innerHeight || document.documentElement.clientHeight;
-      document.querySelectorAll('.page').forEach(function (page) {
-        const f = page.querySelector('.frame');
-        const img = f && f.querySelector('img');
-        if (!img || !img.naturalWidth) return;
-        const ar = img.naturalWidth / img.naturalHeight;
-        let w = vw, h = w / ar;
-        if (h > vh) { h = vh; w = h * ar; }   // 高于屏幕时按高度缩放，完整可见且不滚动
-        f.style.width = w + 'px';
-        f.style.height = h + 'px';
-      });
-      layoutClock();
-    }
-    Array.prototype.forEach.call(document.querySelectorAll('.frame img'), function (img) {
-      if (img.complete) fitFrames(); else img.addEventListener('load', fitFrames);
-    });
-    fitFrames();
-    window.addEventListener('resize', fitFrames);
-    window.addEventListener('orientationchange', function () { setTimeout(fitFrames, 250); });
-    if (window.visualViewport) window.visualViewport.addEventListener('resize', fitFrames);
-
-    /* ── 彻底关闭滑动 / 缩放手势（点击照常触发） ── */
-    document.addEventListener('touchmove', function (e) {
-      if (!e.target.closest || !e.target.closest('.allow-scroll')) e.preventDefault();
-    }, { passive: false });
-    document.addEventListener('gesturestart', function (e) { e.preventDefault(); }, { passive: false });
-    document.addEventListener('wheel', function (e) { e.preventDefault(); }, { passive: false });
 
     function openCouponModal() {
       document.getElementById('couponModal').style.display = 'flex';
