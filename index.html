@@ -354,18 +354,26 @@
     /* 利用枚数 数字：盖在图中「利用枚数 _ 枚」被擦除的位置，随张数动态变化 */
     .qty-num {
       position: absolute;
-      left: 17.49%;
-      top: 32.88%;
-      transform: rotate(-90deg);
-      transform-origin: top left;
-      font-size: 7.2vw;
+      /* 兜底值 = 实测反推（Meiryo/Hiragino 度量）：left 21.744% / top 31.697% / 7.396vw；
+         加载后 layoutQtyNum() 会按 canvas 实测墨迹再精修，保证任何设备字体下都对齐 */
+      left: 21.744%;
+      top: 31.697%;
+      /* 先平移自身 -50% 再旋转，使「元素中心」精确落在 (left, top) */
+      transform: rotate(-90deg) translate(-50%, -50%);
+      transform-origin: 0 0;
+      /* 字体：官方截图字形实测（墨迹 53x41、宽高比 1.293、填充率 0.59、笔画/字高 0.114）
+         与日系黑体一致（Meiryo Bold 0.325/0.560/0.116 最接近），iOS 对应 Hiragino Sans */
+      font-family: "Hiragino Sans", "HiraginoSans-W6", "Hiragino Kaku Gothic ProN", "Meiryo", "Yu Gothic", sans-serif;
+      /* 字号基准：官方墨迹高 = 5.561vw；日系黑体数字墨迹高 ≈ 0.765em → 7.27vw；
+         兜底用实测反推值 7.396vw，运行时再由 layoutQtyNum() 按墨迹高精确反算 */
+      font-size: 7.396vw;
       font-weight: 700;
-      color: #2f3c4b;
       line-height: 1;
+      letter-spacing: 0;
+      color: #2f3c4b;
+      font-variant-numeric: tabular-nums;
       z-index: 10;
       pointer-events: none;
-      font-family: "PingFang SC", "Hiragino Sans", "Microsoft YaHei", sans-serif;
-      font-variant-numeric: normal;
     }
     /* page6点击区域 */
     #page6 .click-area {
@@ -688,8 +696,59 @@
     }
 
     const couponCountEl = document.getElementById('couponCount');
+
+    /* ── 「利用枚数 ○ 枚」数字：按真实字体实测墨迹，精确对齐官方位置（字体无关） ──
+       官方截图（935×1920）实测：墨迹中心 x=198px / y=607.5px → 21.176vw / 64.973vw
+       墨迹高（旋转后为 x 向）= 5.561vw
+       做法：canvas measureText 取 actualBoundingBox，先按墨迹高反算字号，
+             再按「墨迹中心 ≠ 盒子中心」的偏移修正 left/top，保证任何设备上都落在官方位置。 */
+    const QTY_TARGET = { cx: 21.176, cy: 64.973, inkH: 5.561 };  /* 单位 vw */
+    function layoutQtyNum() {
+      var el = document.getElementById('qtyNum');
+      if (!el) return;
+      var vw = document.documentElement.clientWidth / 100;
+      var cs = getComputedStyle(el);
+      var fam = cs.fontFamily, weight = cs.fontWeight || '700';
+      var base = parseFloat(cs.fontSize) || (7.27 * vw);
+      var cv = document.createElement('canvas').getContext('2d');
+      var txt = el.textContent || '1';
+      var setFont = function (px) { cv.font = weight + ' ' + px + 'px ' + fam; };
+
+      setFont(base);
+      var m = cv.measureText(txt);
+      var aba = m.actualBoundingBoxAscent, abd = m.actualBoundingBoxDescent;
+      if (typeof aba !== 'number' || !isFinite(aba) || (aba + abd) <= 0) return; /* 不支持则沿用 CSS 兜底 */
+
+      /* 1) 让墨迹高度 = 官方 5.561vw */
+      var scale = (QTY_TARGET.inkH * vw) / (aba + abd);
+      if (!isFinite(scale) || scale <= 0) return;
+      scale = Math.max(0.75, Math.min(1.35, scale));
+      var fs = base * scale;
+      setFont(fs);
+      m = cv.measureText(txt);
+
+      /* 2) 盒内几何：盒高 = line-height:1 = fs；基线位置由字体 ascent/descent 决定 */
+      var w = m.width;
+      var h = fs;
+      var fba = m.fontBoundingBoxAscent, fbd = m.fontBoundingBoxDescent;
+      if (typeof fba !== 'number' || !isFinite(fba)) return;
+      var baseline = (h - (fba + fbd)) / 2 + fba;
+      var inkTop = baseline - m.actualBoundingBoxAscent;
+      var inkBottom = baseline + m.actualBoundingBoxDescent;
+      var xc = (m.actualBoundingBoxRight - m.actualBoundingBoxLeft) / 2;  /* 盒内墨迹水平中心 */
+      var yc = (inkTop + inkBottom) / 2;                                  /* 盒内墨迹垂直中心 */
+
+      /* 3) rotate(-90deg)：局部 (x,y) → 页面 (+y, -x)；盒子中心已落在 (left, top) */
+      var dx = xc - w / 2;
+      var dy = yc - h / 2;
+      el.style.fontSize = fs + 'px';
+      el.style.left = (QTY_TARGET.cx * vw - dy) + 'px';
+      el.style.top = (QTY_TARGET.cy * vw + dx) + 'px';
+    }
+
     function updateQtyDisplay() {
       document.getElementById('qtyNum').textContent = couponCountEl.textContent;
+      layoutQtyNum();
     }
     document.getElementById('decrease').addEventListener('click', () => {
       let count = parseInt(couponCountEl.textContent);
@@ -716,6 +775,16 @@
       window.addEventListener('load', function () {
         navigator.serviceWorker.register('sw.js').catch(function () {});
       });
+    }
+
+    /* ── 数字定位：首屏 + 尺寸变化时重算 ── */
+    window.addEventListener('load', layoutQtyNum);
+    window.addEventListener('resize', layoutQtyNum);
+    window.addEventListener('orientationchange', function () {
+      setTimeout(layoutQtyNum, 300);
+    });
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(layoutQtyNum).catch(function () {});
     }
 
     /* ── 彻底禁止手指滑动 / 缩放（点击照常触发） ── */
