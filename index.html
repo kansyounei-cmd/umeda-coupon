@@ -81,7 +81,7 @@
       pointer-events: auto;
     }
     /* 原有点击区域样式保留 */
-    .page2-coupon-click, .page3-notice-area, .page5-click-area, #page6 .click-area {
+    .page2-coupon-click, .page3-notice-area, #page6 .click-area {
       pointer-events: auto;
     }
     .btn-area {
@@ -227,6 +227,70 @@
     .confirm-btn:active {
       background-color: #2e4256;
     }
+    /* ── 注意事项弹窗：与张数弹窗同一层背景（page2 不变），仅换卡片内容 ── */
+    .notice-card {
+      background-color: #fff;
+      padding: 30px 19px 27px;
+      border-radius: 12px;
+      width: 65%;
+      min-width: 280px;
+      max-width: 340px;
+      box-sizing: border-box;
+      position: relative;
+      font-family: "PingFang SC", "Hiragino Sans", "Microsoft YaHei", sans-serif;
+    }
+    .nt-title {
+      margin: 0 0 18px;
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 20px;
+      color: #29333f;
+      text-align: center;
+    }
+    .nt-body {
+      margin: 0;
+      padding: 0;
+      text-align: left;
+    }
+    .nt-body p {
+      margin: 0;
+      font-size: 13px;
+      line-height: 17px;
+      color: #2f3c4b;
+      padding-left: 19px;
+      text-indent: -19px;
+    }
+    .nt-btn {
+      display: block;
+      width: 100%;
+      height: 42px;
+      margin: 22px 0 0;
+      background-color: #222f3e;
+      color: #fff;
+      border: none;
+      border-radius: 21px;
+      font-size: 14.5px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      font-family: inherit;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .nt-btn:active { background-color: #36455a; }
+    .nt-cancel {
+      display: block;
+      margin: 21px auto 0;
+      padding: 2px 10px;
+      background: none;
+      border: none;
+      font-size: 13.5px;
+      font-weight: 700;
+      color: #29333f;
+      font-family: inherit;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .nt-cancel:active { opacity: .55; }
     .barcode-page {
       position: relative;
     }
@@ -268,12 +332,12 @@
     .td-time.expired {
       color: #ff0000;
     }
-    #page3, #page5, #page6 {
+    #page3, #page6 {
       text-align: center;
       padding: 20px 0;
       position: relative;
     }
-    #page3 img, #page5 img, #page6 img {
+    #page3 img, #page6 img {
       max-width: 100%;
       margin: 0 auto;
     }
@@ -287,15 +351,21 @@
       cursor: pointer;
       z-index: 10;
     }
-    .page5-click-area {
+    /* 利用枚数 数字：盖在图中「利用枚数 _ 枚」被擦除的位置，随张数动态变化 */
+    .qty-num {
       position: absolute;
-      top: 50.8%;
-      left: 4.5%;
-      width: 76%;
-      height: 5.8%;
-      background-color: transparent;
-      cursor: pointer;
+      left: 17.49%;
+      top: 32.88%;
+      transform: rotate(-90deg);
+      transform-origin: top left;
+      font-size: 7.2vw;
+      font-weight: 700;
+      color: #2f3c4b;
+      line-height: 1;
       z-index: 10;
+      pointer-events: none;
+      font-family: "PingFang SC", "Hiragino Sans", "Microsoft YaHei", sans-serif;
+      font-variant-numeric: normal;
     }
     /* page6点击区域 */
     #page6 .click-area {
@@ -403,24 +473,16 @@
     ></div>
   </div>
 
-  </div>
-
-  <div class="page" id="page5">
-    <img 
-      src="page5.jpg" 
-      alt="优惠券确认页"
-    >
-    <div class="page5-click-area" onclick="switchPage('page5', 'page4')"></div>
-  </div>
-
   <div class="page" id="page4">
     <!-- 右侧1/3点击区域，直接跳转page6 -->
     <div class="right-third-click" onclick="switchPage('page4', 'page6')"></div>
     <div class="barcode-page">
-      <img 
-        src="page4.png" 
+      <img
+        src="page4.png"
         alt="优惠券条码"
       >
+      <!-- 利用枚数数字（图中「利用枚数 _ 枚」的动态数字） -->
+      <div class="qty-num" id="qtyNum">1</div>
       <div class="time-display" id="page4TimeDisplay"></div>
     </div>
   </div>
@@ -456,6 +518,21 @@
         <button id="increase" type="button" aria-label="增加">+</button>
       </div>
       <button class="confirm-btn" onclick="confirmCoupon()">确定</button>
+    </div>
+  </div>
+
+  <!-- 注意事项弹窗：背景仍是 page2，与张数弹窗完全同一层，无背景跳动 -->
+  <div class="modal" id="noticeModal">
+    <div class="notice-card">
+      <span class="close-modal" id="noticeClose" onclick="closeNotice(true)">&times;</span>
+      <h3 class="nt-title">关于使用优惠券的注意事项</h3>
+      <div class="nt-body">
+        <p>● 此后将无法返回并进行操作。</p>
+        <p>● 优惠券显示后将无法重新发放。</p>
+        <p>● 显示时间为 10 分钟。超过显示时间后无法使用。</p>
+      </div>
+      <button class="nt-btn" onclick="noticeConfirm()">了解上述内容并使用优惠券</button>
+      <button class="nt-cancel" onclick="closeNotice(true)">暂不使用</button>
     </div>
   </div>
 
@@ -594,23 +671,44 @@
       document.getElementById('couponModal').style.display = 'none';
     }
 
+    /* ── 注意事项弹窗：与张数弹窗共用 page2 背景，X / 暂不使用 可返回重选张数 ── */
+    function openNotice() {
+      updateQtyDisplay();
+      document.getElementById('noticeModal').style.display = 'flex';
+    }
+
+    function closeNotice(backToQty) {
+      document.getElementById('noticeModal').style.display = 'none';
+      if (backToQty) openCouponModal();   /* 回到上一画面，继续选择张数 */
+    }
+
+    function noticeConfirm() {
+      closeNotice(false);
+      switchPage('page2', 'page4');
+    }
+
     const couponCountEl = document.getElementById('couponCount');
+    function updateQtyDisplay() {
+      document.getElementById('qtyNum').textContent = couponCountEl.textContent;
+    }
     document.getElementById('decrease').addEventListener('click', () => {
       let count = parseInt(couponCountEl.textContent);
       if (count > 1) {
         couponCountEl.textContent = count - 1;
+        updateQtyDisplay();
       }
     });
     document.getElementById('increase').addEventListener('click', () => {
       let count = parseInt(couponCountEl.textContent);
       if (count < 9) {
         couponCountEl.textContent = count + 1;
+        updateQtyDisplay();
       }
     });
 
     function confirmCoupon() {
       closeCouponModal();
-      switchPage('page2', 'page5');
+      openNotice();
     }
 
     /* ── 注册 Service Worker（离线可用 + Android 可安装） ── */
