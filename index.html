@@ -587,6 +587,9 @@
       }
       if (toPageId === 'page4' || toPageId === 'page6') {
         layoutClock();
+        /* 数字按「图片实际 rect」定位，而隐藏页(display:none)的 rect 为 0，
+           所以切页完成后必须重算一次，否则会停在 CSS 兜底位置（page6 会差 20 CSS px）。 */
+        layoutQtyNum();
       }
     }
 
@@ -705,9 +708,12 @@
        page4 / page6 图中烤死的数字均已擦除，由 .qty-num 动态盖回。
        每个元素用 data-cx / data-cy / data-inkh 声明官方目标（单位 vw，相对图宽），data-q 为要显示的数字。
        为什么改成自绘 canvas：DOM 排版用的字体度量（measureText / line-height / fontBoundingBox）
-       与「真实光栅化出来的墨迹」在 iOS 上会差 4~5%（正好一个字符位，真机上就表现为数字错位一格）。
+       与「真实光栅化出来的墨迹」在 iOS 上会差 4~5%（真机上表现为数字错位）。
        只有「测量与渲染用同一个引擎」——即把字画到 canvas 上、再在同一张 canvas 上逐像素扫墨迹——
-       才能保证任何设备/任何字体下，墨迹中心都精确落在官方那个空格里。 */
+       才能保证任何设备/任何字体下，墨迹中心都精确落在官方那个空格里。
+       另外：data-cx/cy 是**相对图片**的坐标，不能按 .page 定位 —— page6 的 <img> 上方有 20px
+       空白文本行盒（图片实际从 y=20 起），按页面定位会整整差 20 CSS px ≈ 1.4 个字符位（v11 修复的主因）。
+       下面运行时读 img 的实际 rect 作为原点，任何设备/任何版式都自动对齐。 */
     function drawQtyNum(el) {
       var cx = parseFloat(el.dataset.cx) || 21.2879;
       var cy = parseFloat(el.dataset.cy) || 64.9985;
@@ -716,6 +722,18 @@
       var vw = document.documentElement.clientWidth / 100;
       var dpr = window.devicePixelRatio || 1;
       var cssSize = parseFloat(el.dataset.size) || 12;   /* 与 CSS 的 12vw 保持一致 */
+
+      /* ① 先把 canvas 中心对准「图片坐标系」里的官方目标 */
+      var pg = el.closest ? el.closest('.page') : null;
+      var img = pg ? pg.querySelector('img') : null;
+      var par = el.offsetParent || el.parentElement;
+      if (img && par) {
+        var ir = img.getBoundingClientRect(), pr = par.getBoundingClientRect();
+        if (ir.width > 0) {
+          el.style.left = (ir.left - pr.left + cx * vw - cssSize * vw / 2) + 'px';
+          el.style.top = (ir.top - pr.top + cy * vw - cssSize * vw / 2) + 'px';
+        }
+      }
       var size = Math.max(8, Math.round(cssSize * vw * dpr));
       if (el.width !== size || el.height !== size) { el.width = size; el.height = size; }
       var ctx = el.getContext('2d', { willReadFrequently: true });
