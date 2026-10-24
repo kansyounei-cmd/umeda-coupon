@@ -354,19 +354,19 @@
     /* 利用枚数 数字：盖在图中「利用枚数 _ 枚」被擦除的位置，随张数动态变化 */
     .qty-num {
       position: absolute;
-      /* 兜底值 = 实测反推（Meiryo/Hiragino 度量）：left 21.744% / top 31.697% / 7.396vw；
-         加载后 layoutQtyNum() 会按 canvas 实测墨迹再精修，保证任何设备字体下都对齐 */
-      left: 21.744%;
-      top: 31.697%;
+      /* 兜底值 = 本机实测反推（元素中心，非墨迹中心）：left 21.743% / top 64.99% / 7.412vw；
+         加载后 layoutQtyNum() 会按 canvas 逐像素实测墨迹再精修，保证任何设备字体下都对齐官方。
+         官方目标（page6.png 1320 原图实测）：墨迹中心 x=281/1320=21.2879vw、y=858/1320=64.9985vw，墨迹高 75/1320=5.6818vw */
+      left: 21.743%;
+      top: 64.99%;
       /* 先平移自身 -50% 再旋转，使「元素中心」精确落在 (left, top) */
       transform: rotate(-90deg) translate(-50%, -50%);
       transform-origin: 0 0;
       /* 字体：官方截图字形实测（墨迹 53x41、宽高比 1.293、填充率 0.59、笔画/字高 0.114）
          与日系黑体一致（Meiryo Bold 0.325/0.560/0.116 最接近），iOS 对应 Hiragino Sans */
       font-family: "Hiragino Sans", "HiraginoSans-W6", "Hiragino Kaku Gothic ProN", "Meiryo", "Yu Gothic", sans-serif;
-      /* 字号基准：官方墨迹高 = 5.561vw；日系黑体数字墨迹高 ≈ 0.765em → 7.27vw；
-         兜底用实测反推值 7.396vw，运行时再由 layoutQtyNum() 按墨迹高精确反算 */
-      font-size: 7.396vw;
+      /* 字号基准：官方墨迹高 = 5.6818vw；日系黑体数字墨迹高 ≈ 0.767em → 7.41vw */
+      font-size: 7.412vw;
       font-weight: 700;
       line-height: 1;
       letter-spacing: 0;
@@ -489,18 +489,24 @@
         src="page4.png"
         alt="优惠券条码"
       >
-      <!-- 利用枚数数字（图中「利用枚数 _ 枚」的动态数字） -->
-      <div class="qty-num" id="qtyNum">1</div>
+      <!-- 利用枚数数字（图中「利用枚数 _ 枚」烤死数字已擦除，与张数联动）
+           page4.png 是官方 1320 原图的 0.7083 缩放版，两张图 vw 坐标完全一致，
+           故与 page6 共用同一官方目标：墨迹中心 x=281/1320=21.2879vw、y=858/1320=64.9985vw，墨迹高 75/1320=5.6818vw -->
+      <div class="qty-num" id="qtyNum" data-cx="21.2879" data-cy="64.9985" data-inkh="5.6818">1</div>
       <div class="time-display" id="page4TimeDisplay"></div>
     </div>
   </div>
 
   <!-- 新增page6页面 -->
   <div class="page" id="page6">
-    <img 
-      src="page6.png" 
+    <img
+      src="page6.png"
       alt="优惠券使用完成页"
     >
+    <!-- 利用枚数数字（page6 图中「利用枚数 _ 枚」烤死数字已擦除，与张数联动）
+         官方墨迹中心 x=281/1320=21.2879vw、y=858/1320=64.9985vw，墨迹高 75/1320=5.6818vw -->
+    <div class="qty-num" id="qtyNum6"
+         data-cx="21.2879" data-cy="64.9985" data-inkh="5.6818">1</div>
     <div class="time-display" id="page6TimeDisplay"></div>
     <div class="click-area" onclick="switchPage('page6', 'page7')"></div>
   </div>
@@ -533,7 +539,7 @@
   <div class="modal" id="noticeModal">
     <div class="notice-card">
       <span class="close-modal" id="noticeClose" onclick="closeNotice(true)">&times;</span>
-      <h3 class="nt-title">关于使用优惠券的注意事项</h3>
+      <h3 class="nt-title">关于使用优惠券的注意<br>事项</h3>
       <div class="nt-body">
         <p>● 此后将无法返回并进行操作。</p>
         <p>● 优惠券显示后将无法重新发放。</p>
@@ -697,57 +703,87 @@
 
     const couponCountEl = document.getElementById('couponCount');
 
-    /* ── 「利用枚数 ○ 枚」数字：按真实字体实测墨迹，精确对齐官方位置（字体无关） ──
-       官方截图（935×1920）实测：墨迹中心 x=198px / y=607.5px → 21.176vw / 64.973vw
-       墨迹高（旋转后为 x 向）= 5.561vw
-       做法：canvas measureText 取 actualBoundingBox，先按墨迹高反算字号，
-             再按「墨迹中心 ≠ 盒子中心」的偏移修正 left/top，保证任何设备上都落在官方位置。 */
-    const QTY_TARGET = { cx: 21.176, cy: 64.973, inkH: 5.561 };  /* 单位 vw */
+    /* ── 「利用枚数 ○ 枚」数字：按真实字体逐像素实测墨迹，精确对齐官方位置（字体无关） ──
+       page4 / page6 图中烤死的数字均已擦除，由 .qty-num 动态盖回。
+       每个元素用 data-cx / data-cy / data-inkh 声明官方目标（单位 vw，相对图宽）。
+       做法：把数字画到离屏 canvas 上逐像素扫描 alpha 得到「真实渲染墨迹盒」
+             （measureText 的 metrics 与实际光栅化有 4~5% 偏差，故不用它定尺寸），
+             先按墨迹高反算字号，再按「墨迹中心 ≠ 盒子中心」的偏移修正 left/top。 */
+    var _qtyCv = document.createElement('canvas');
+    function measureQtyInk(weight, fam, txt, px) {
+      var ctx = _qtyCv.getContext('2d', { willReadFrequently: true });
+      var S = 4, m = Math.ceil(px * S * 2.2);
+      _qtyCv.width = m; _qtyCv.height = m;          /* 重置画布（同时清空状态） */
+      ctx.font = weight + ' ' + (px * S) + 'px ' + fam;
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillStyle = '#000';
+      ctx.clearRect(0, 0, m, m);
+      var bx = Math.ceil(m * 0.25), by = Math.ceil(m * 0.7);
+      ctx.fillText(txt, bx, by);
+      var d = ctx.getImageData(0, 0, m, m).data;
+      var minX = -1, maxX = -1, minY = -1, maxY = -1;
+      for (var y = 0; y < m; y++) {
+        for (var x = 0; x < m; x++) {
+          if (d[(y * m + x) * 4 + 3] > 64) {
+            if (minX < 0 || x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (minY < 0 || y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+      if (minX < 0) return null;
+      var tm = ctx.measureText(txt);
+      return {
+        inkH: (maxY - minY + 1) / S,
+        cxFromOrigin: ((minX + maxX) / 2 - bx) / S,   /* 墨迹中心相对文字原点 */
+        cyFromBaseline: ((minY + maxY) / 2 - by) / S, /* 墨迹中心相对基线（向下为正） */
+        advance: tm.width / S,
+        fba: tm.fontBoundingBoxAscent / S,
+        fbd: tm.fontBoundingBoxDescent / S
+      };
+    }
     function layoutQtyNum() {
-      var el = document.getElementById('qtyNum');
-      if (!el) return;
+      var els = document.querySelectorAll('.qty-num');
+      if (!els.length) return;
       var vw = document.documentElement.clientWidth / 100;
-      var cs = getComputedStyle(el);
-      var fam = cs.fontFamily, weight = cs.fontWeight || '700';
-      var base = parseFloat(cs.fontSize) || (7.27 * vw);
-      var cv = document.createElement('canvas').getContext('2d');
-      var txt = el.textContent || '1';
-      var setFont = function (px) { cv.font = weight + ' ' + px + 'px ' + fam; };
+      for (var k = 0; k < els.length; k++) {
+        var el = els[k];
+        var cx = parseFloat(el.dataset.cx) || 21.2121;
+        var cy = parseFloat(el.dataset.cy) || 64.9985;
+        var inkHvw = parseFloat(el.dataset.inkh) || 5.6818;
+        var cs = getComputedStyle(el);
+        var fam = cs.fontFamily, weight = cs.fontWeight || '700';
+        var base = parseFloat(cs.fontSize) || (7.4 * vw);
+        var txt = el.textContent || '1';
 
-      setFont(base);
-      var m = cv.measureText(txt);
-      var aba = m.actualBoundingBoxAscent, abd = m.actualBoundingBoxDescent;
-      if (typeof aba !== 'number' || !isFinite(aba) || (aba + abd) <= 0) return; /* 不支持则沿用 CSS 兜底 */
+        var r1 = measureQtyInk(weight, fam, txt, base);
+        if (!r1 || !isFinite(r1.inkH) || r1.inkH <= 0) continue;  /* 不支持则沿用 CSS 兜底 */
 
-      /* 1) 让墨迹高度 = 官方 5.561vw */
-      var scale = (QTY_TARGET.inkH * vw) / (aba + abd);
-      if (!isFinite(scale) || scale <= 0) return;
-      scale = Math.max(0.75, Math.min(1.35, scale));
-      var fs = base * scale;
-      setFont(fs);
-      m = cv.measureText(txt);
+        /* 1) 让真实墨迹高度 = 官方 inkHvw */
+        var scale = (inkHvw * vw) / r1.inkH;
+        if (!isFinite(scale) || scale <= 0) continue;
+        scale = Math.max(0.75, Math.min(1.35, scale));
+        var fs = base * scale;
 
-      /* 2) 盒内几何：盒高 = line-height:1 = fs；基线位置由字体 ascent/descent 决定 */
-      var w = m.width;
-      var h = fs;
-      var fba = m.fontBoundingBoxAscent, fbd = m.fontBoundingBoxDescent;
-      if (typeof fba !== 'number' || !isFinite(fba)) return;
-      var baseline = (h - (fba + fbd)) / 2 + fba;
-      var inkTop = baseline - m.actualBoundingBoxAscent;
-      var inkBottom = baseline + m.actualBoundingBoxDescent;
-      var xc = (m.actualBoundingBoxRight - m.actualBoundingBoxLeft) / 2;  /* 盒内墨迹水平中心 */
-      var yc = (inkTop + inkBottom) / 2;                                  /* 盒内墨迹垂直中心 */
+        /* 2) 用最终字号重测，并求盒内几何（盒高 = line-height:1 = fs） */
+        var r = measureQtyInk(weight, fam, txt, fs);
+        if (!r || !isFinite(r.fba) || !isFinite(r.fbd)) continue;
+        var baseline = (fs - (r.fba + r.fbd)) / 2 + r.fba;
+        var inkCenterY = baseline + r.cyFromBaseline;
 
-      /* 3) rotate(-90deg)：局部 (x,y) → 页面 (+y, -x)；盒子中心已落在 (left, top) */
-      var dx = xc - w / 2;
-      var dy = yc - h / 2;
-      el.style.fontSize = fs + 'px';
-      el.style.left = (QTY_TARGET.cx * vw - dy) + 'px';
-      el.style.top = (QTY_TARGET.cy * vw + dx) + 'px';
+        /* 3) rotate(-90deg)：局部 (x,y) → 页面 (+y, -x)；盒子中心已落在 (left, top) */
+        var dx = r.cxFromOrigin - r.advance / 2;
+        var dy = inkCenterY - fs / 2;
+        el.style.fontSize = fs + 'px';
+        el.style.left = (cx * vw - dy) + 'px';
+        el.style.top = (cy * vw + dx) + 'px';
+      }
     }
 
     function updateQtyDisplay() {
-      document.getElementById('qtyNum').textContent = couponCountEl.textContent;
+      var els = document.querySelectorAll('.qty-num');
+      for (var i = 0; i < els.length; i++) els[i].textContent = couponCountEl.textContent;
       layoutQtyNum();
     }
     document.getElementById('decrease').addEventListener('click', () => {
