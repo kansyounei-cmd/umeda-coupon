@@ -1,7 +1,7 @@
 /* 大丸・松坂屋 优惠券演示 PWA — Service Worker
    作用：① 离线可用 ② Android Chrome 识别为可安装应用
    每次更换图片后请把 CACHE 版本号 +1，用户端才会拿到新图。 */
-const CACHE = 'umeda-pwa-v10';
+const CACHE = 'umeda-pwa-v11';
 const ASSETS = [
   './',
   './index.html',

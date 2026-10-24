@@ -351,27 +351,25 @@
       cursor: pointer;
       z-index: 10;
     }
-    /* 利用枚数 数字：盖在图中「利用枚数 _ 枚」被擦除的位置，随张数动态变化 */
+    /* 利用枚数 数字：数字直接绘制在 canvas 上，并在同一 canvas 内实测墨迹后精确居中，
+       测量与渲染同源 → 任何设备/字体下墨迹中心都精确落在官方位置（不再依赖跨引擎字体度量）。
+       官方目标（page6.png 1320 原图实测）：墨迹中心 x=281/1320=21.2879vw、y=858/1320=64.9985vw，墨迹高 75/1320=5.6818vw
+       canvas 为 12vw 正方形、中心对准目标（旋转 -90° 关于中心旋转，中心不动），故 left/top = 目标 - 6vw */
     .qty-num {
       position: absolute;
-      /* 兜底值 = 本机实测反推（元素中心，非墨迹中心）：left 21.743% / top 64.99% / 7.412vw；
-         加载后 layoutQtyNum() 会按 canvas 逐像素实测墨迹再精修，保证任何设备字体下都对齐官方。
-         官方目标（page6.png 1320 原图实测）：墨迹中心 x=281/1320=21.2879vw、y=858/1320=64.9985vw，墨迹高 75/1320=5.6818vw */
-      left: 21.743%;
-      top: 64.99%;
-      /* 先平移自身 -50% 再旋转，使「元素中心」精确落在 (left, top) */
-      transform: rotate(-90deg) translate(-50%, -50%);
-      transform-origin: 0 0;
-      /* 字体：官方截图字形实测（墨迹 53x41、宽高比 1.293、填充率 0.59、笔画/字高 0.114）
-         与日系黑体一致（Meiryo Bold 0.325/0.560/0.116 最接近），iOS 对应 Hiragino Sans */
+      width: 12vw;
+      height: 12vw;
+      left: 15.288vw;   /* 21.2879 - 6 */
+      top: 58.999vw;    /* 64.9985 - 6 */
+      transform: rotate(-90deg);
+      margin: 0;
+      padding: 0;
+      display: block;
+      /* 字体：官方字形为日系黑体（Meiryo Bold 最接近），iOS 对应 Hiragino Sans */
       font-family: "Hiragino Sans", "HiraginoSans-W6", "Hiragino Kaku Gothic ProN", "Meiryo", "Yu Gothic", sans-serif;
-      /* 字号基准：官方墨迹高 = 5.6818vw；日系黑体数字墨迹高 ≈ 0.767em → 7.41vw */
-      font-size: 7.412vw;
+      font-size: 7.412vw;   /* 仅作为字号初值；真实字号由 JS 在 canvas 内按墨迹高反算 */
       font-weight: 700;
-      line-height: 1;
-      letter-spacing: 0;
       color: #2f3c4b;
-      font-variant-numeric: tabular-nums;
       z-index: 10;
       pointer-events: none;
     }
@@ -492,7 +490,7 @@
       <!-- 利用枚数数字（图中「利用枚数 _ 枚」烤死数字已擦除，与张数联动）
            page4.png 是官方 1320 原图的 0.7083 缩放版，两张图 vw 坐标完全一致，
            故与 page6 共用同一官方目标：墨迹中心 x=281/1320=21.2879vw、y=858/1320=64.9985vw，墨迹高 75/1320=5.6818vw -->
-      <div class="qty-num" id="qtyNum" data-cx="21.2879" data-cy="64.9985" data-inkh="5.6818">1</div>
+      <canvas class="qty-num" id="qtyNum" data-cx="21.2879" data-cy="64.9985" data-inkh="5.6818" data-q="1">1</canvas>
       <div class="time-display" id="page4TimeDisplay"></div>
     </div>
   </div>
@@ -505,8 +503,8 @@
     >
     <!-- 利用枚数数字（page6 图中「利用枚数 _ 枚」烤死数字已擦除，与张数联动）
          官方墨迹中心 x=281/1320=21.2879vw、y=858/1320=64.9985vw，墨迹高 75/1320=5.6818vw -->
-    <div class="qty-num" id="qtyNum6"
-         data-cx="21.2879" data-cy="64.9985" data-inkh="5.6818">1</div>
+    <canvas class="qty-num" id="qtyNum6"
+            data-cx="21.2879" data-cy="64.9985" data-inkh="5.6818" data-q="1">1</canvas>
     <div class="time-display" id="page6TimeDisplay"></div>
     <div class="click-area" onclick="switchPage('page6', 'page7')"></div>
   </div>
@@ -705,85 +703,101 @@
 
     /* ── 「利用枚数 ○ 枚」数字：按真实字体逐像素实测墨迹，精确对齐官方位置（字体无关） ──
        page4 / page6 图中烤死的数字均已擦除，由 .qty-num 动态盖回。
-       每个元素用 data-cx / data-cy / data-inkh 声明官方目标（单位 vw，相对图宽）。
-       做法：把数字画到离屏 canvas 上逐像素扫描 alpha 得到「真实渲染墨迹盒」
-             （measureText 的 metrics 与实际光栅化有 4~5% 偏差，故不用它定尺寸），
-             先按墨迹高反算字号，再按「墨迹中心 ≠ 盒子中心」的偏移修正 left/top。 */
-    var _qtyCv = document.createElement('canvas');
-    function measureQtyInk(weight, fam, txt, px) {
-      var ctx = _qtyCv.getContext('2d', { willReadFrequently: true });
-      var S = 4, m = Math.ceil(px * S * 2.2);
-      _qtyCv.width = m; _qtyCv.height = m;          /* 重置画布（同时清空状态） */
-      ctx.font = weight + ' ' + (px * S) + 'px ' + fam;
-      ctx.textBaseline = 'alphabetic';
-      ctx.fillStyle = '#000';
-      ctx.clearRect(0, 0, m, m);
-      var bx = Math.ceil(m * 0.25), by = Math.ceil(m * 0.7);
-      ctx.fillText(txt, bx, by);
-      var d = ctx.getImageData(0, 0, m, m).data;
-      var minX = -1, maxX = -1, minY = -1, maxY = -1;
-      for (var y = 0; y < m; y++) {
-        for (var x = 0; x < m; x++) {
-          if (d[(y * m + x) * 4 + 3] > 64) {
-            if (minX < 0 || x < minX) minX = x;
-            if (x > maxX) maxX = x;
-            if (minY < 0 || y < minY) minY = y;
-            if (y > maxY) maxY = y;
-          }
+       每个元素用 data-cx / data-cy / data-inkh 声明官方目标（单位 vw，相对图宽），data-q 为要显示的数字。
+       为什么改成自绘 canvas：DOM 排版用的字体度量（measureText / line-height / fontBoundingBox）
+       与「真实光栅化出来的墨迹」在 iOS 上会差 4~5%（正好一个字符位，真机上就表现为数字错位一格）。
+       只有「测量与渲染用同一个引擎」——即把字画到 canvas 上、再在同一张 canvas 上逐像素扫墨迹——
+       才能保证任何设备/任何字体下，墨迹中心都精确落在官方那个空格里。 */
+    function drawQtyNum(el) {
+      var cx = parseFloat(el.dataset.cx) || 21.2879;
+      var cy = parseFloat(el.dataset.cy) || 64.9985;
+      var inkHvw = parseFloat(el.dataset.inkh) || 5.6818;
+      var txt = el.dataset.q || el.textContent || '1';
+      var vw = document.documentElement.clientWidth / 100;
+      var dpr = window.devicePixelRatio || 1;
+      var cssSize = parseFloat(el.dataset.size) || 12;   /* 与 CSS 的 12vw 保持一致 */
+      var size = Math.max(8, Math.round(cssSize * vw * dpr));
+      if (el.width !== size || el.height !== size) { el.width = size; el.height = size; }
+      var ctx = el.getContext('2d', { willReadFrequently: true });
+      if (!ctx) return false;
+
+      var cs = getComputedStyle(el);
+      var fam = cs.fontFamily || 'sans-serif';
+      var weight = cs.fontWeight || '700';
+      var color = cs.color || '#2f3c4b';
+      var target = inkHvw * vw * dpr;              /* 目标墨迹高（设备像素，canvas 局部纵向 = 页面横向） */
+      var C = size / 2;                            /* canvas 中心；CSS 的 left/top 已把中心对准官方目标 */
+      var fs = (parseFloat(cs.fontSize) || (7.412 * vw)) * dpr;
+      var ax = C, ay = C;                          /* 文字锚点（textAlign=center / textBaseline=middle） */
+
+      function setFont(px) {
+        ctx.font = weight + ' ' + px + 'px ' + fam;
+        /* canvas 解析 font 失败时会静默保留旧值（默认 10px sans-serif）→ 数字会变成小字，必须校验 */
+        var m = /(\d+(?:\.\d+)?)px/.exec(ctx.font);
+        if (!m || Math.abs(parseFloat(m[1]) - px) > 0.51) {
+          ctx.font = weight + ' ' + px + 'px sans-serif';
         }
       }
-      if (minX < 0) return null;
-      var tm = ctx.measureText(txt);
-      return {
-        inkH: (maxY - minY + 1) / S,
-        cxFromOrigin: ((minX + maxX) / 2 - bx) / S,   /* 墨迹中心相对文字原点 */
-        cyFromBaseline: ((minY + maxY) / 2 - by) / S, /* 墨迹中心相对基线（向下为正） */
-        advance: tm.width / S,
-        fba: tm.fontBoundingBoxAscent / S,
-        fbd: tm.fontBoundingBoxDescent / S
-      };
-    }
-    function layoutQtyNum() {
-      var els = document.querySelectorAll('.qty-num');
-      if (!els.length) return;
-      var vw = document.documentElement.clientWidth / 100;
-      for (var k = 0; k < els.length; k++) {
-        var el = els[k];
-        var cx = parseFloat(el.dataset.cx) || 21.2121;
-        var cy = parseFloat(el.dataset.cy) || 64.9985;
-        var inkHvw = parseFloat(el.dataset.inkh) || 5.6818;
-        var cs = getComputedStyle(el);
-        var fam = cs.fontFamily, weight = cs.fontWeight || '700';
-        var base = parseFloat(cs.fontSize) || (7.4 * vw);
-        var txt = el.textContent || '1';
 
-        var r1 = measureQtyInk(weight, fam, txt, base);
-        if (!r1 || !isFinite(r1.inkH) || r1.inkH <= 0) continue;  /* 不支持则沿用 CSS 兜底 */
-
-        /* 1) 让真实墨迹高度 = 官方 inkHvw */
-        var scale = (inkHvw * vw) / r1.inkH;
-        if (!isFinite(scale) || scale <= 0) continue;
-        scale = Math.max(0.75, Math.min(1.35, scale));
-        var fs = base * scale;
-
-        /* 2) 用最终字号重测，并求盒内几何（盒高 = line-height:1 = fs） */
-        var r = measureQtyInk(weight, fam, txt, fs);
-        if (!r || !isFinite(r.fba) || !isFinite(r.fbd)) continue;
-        var baseline = (fs - (r.fba + r.fbd)) / 2 + r.fba;
-        var inkCenterY = baseline + r.cyFromBaseline;
-
-        /* 3) rotate(-90deg)：局部 (x,y) → 页面 (+y, -x)；盒子中心已落在 (left, top) */
-        var dx = r.cxFromOrigin - r.advance / 2;
-        var dy = inkCenterY - fs / 2;
-        el.style.fontSize = fs + 'px';
-        el.style.left = (cx * vw - dy) + 'px';
-        el.style.top = (cy * vw + dx) + 'px';
+      function paint() {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, size, size);
+        setFont(fs);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = color;
+        ctx.fillText(txt, ax, ay);
       }
+      function inkBox() {
+        var d;
+        try { d = ctx.getImageData(0, 0, size, size).data; } catch (e) { return null; }
+        var minX = -1, maxX = -1, minY = -1, maxY = -1;
+        for (var y = 0; y < size; y++) {
+          for (var x = 0; x < size; x++) {
+            if (d[(y * size + x) * 4 + 3] > 8) {   /* 与官方实测同口径：官方背景204、阈值lum<200，等效覆盖率仅约2% */
+              if (minX < 0) { minX = maxX = x; minY = maxY = y; }
+              else {
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+              }
+            }
+          }
+        }
+        if (minX < 0) return null;
+        return { minX: minX, maxX: maxX, minY: minY, maxY: maxY };
+      }
+
+      /* 迭代收敛：① 按墨迹高反算字号 ② 把墨迹中心挪到 canvas 中心（偏移量随字号等比缩放） */
+      for (var it = 0; it < 6; it++) {
+        paint();
+        var b = inkBox();
+        if (!b) return false;
+        var ih = b.maxY - b.minY + 1;
+        var k = target / ih;
+        if (!isFinite(k) || k <= 0) return false;
+        k = Math.max(0.5, Math.min(2, k));
+        var icx = (b.minX + b.maxX) / 2, icy = (b.minY + b.maxY) / 2;
+        var nfs = fs * k;
+        var nax = ax + (C - ax) - k * (icx - ax);
+        var nay = ay + (C - ay) - k * (icy - ay);
+        var done = Math.abs(nfs - fs) < 0.05 && Math.abs(nax - ax) < 0.05 && Math.abs(nay - ay) < 0.05;
+        fs = nfs; ax = nax; ay = nay;
+        if (done) break;
+      }
+      paint();
+      return true;
+    }
+
+    function layoutQtyNum() {
+      var els = document.querySelectorAll('canvas.qty-num');
+      for (var k = 0; k < els.length; k++) drawQtyNum(els[k]);
     }
 
     function updateQtyDisplay() {
-      var els = document.querySelectorAll('.qty-num');
-      for (var i = 0; i < els.length; i++) els[i].textContent = couponCountEl.textContent;
+      var els = document.querySelectorAll('canvas.qty-num');
+      for (var i = 0; i < els.length; i++) els[i].dataset.q = couponCountEl.textContent;
       layoutQtyNum();
     }
     document.getElementById('decrease').addEventListener('click', () => {
